@@ -3,7 +3,7 @@
 > **Semantic search for SuperPlane workflow issues.**
 > Your team's collective ops memory — log what went wrong, what fixed it, and search by *meaning*, not keywords.
 
-[![Launch in SuperPlane](https://img.shields.io/badge/Launch%20in-SuperPlane-blue?style=for-the-badge)](https://app.superplane.com/import?repo=https://github.com/YOUR_USERNAME/superrecall)
+[![Launch in SuperPlane](https://img.shields.io/badge/Launch%20in-SuperPlane-blue?style=for-the-badge)](https://app.superplane.com/import?repo=https://github.com/madisonoliviaa/superrecall)
 
 ---
 
