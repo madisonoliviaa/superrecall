@@ -1,0 +1,307 @@
+apiVersion: "v1"
+kind: "Canvas"
+metadata:
+  name: "hackatonsf-superrecall"
+  description: "SuperRecall — Semantic workflow memory. Auto-captures issues, searches past fixes, and notifies the team."
+  isTemplate: false
+spec:
+  nodes:
+    # ── Triggers ─────────────────────────────────────────────────────
+
+    - id: "workflow-failed"
+      name: "Workflow Failed"
+      type: "TYPE_TRIGGER"
+      component: "start"
+      configuration:
+        templates:
+          - name: "log-failure"
+            parameters:
+              - name: "service"
+                type: "string"
+              - name: "environment"
+                type: "string"
+              - name: "error_message"
+                type: "string"
+              - name: "workflow_name"
+                type: "string"
+            payload:
+              service: '{{ parameters["service"] }}'
+              environment: '{{ parameters["environment"] }}'
+              error_message: '{{ parameters["error_message"] }}'
+              workflow_name: '{{ parameters["workflow_name"] }}'
+      position:
+        x: 120
+        "y": 100
+      isCollapsed: false
+      paused: false
+
+    - id: "manual-log"
+      name: "Log Fix Manually"
+      type: "TYPE_TRIGGER"
+      component: "start"
+      configuration:
+        templates:
+          - name: "log-fix"
+            parameters:
+              - name: "service"
+                type: "string"
+              - name: "environment"
+                type: "string"
+              - name: "error_message"
+                type: "string"
+              - name: "root_cause"
+                type: "string"
+              - name: "fix_applied"
+                type: "string"
+              - name: "severity"
+                type: "string"
+            payload:
+              service: '{{ parameters["service"] }}'
+              environment: '{{ parameters["environment"] }}'
+              error_message: '{{ parameters["error_message"] }}'
+              root_cause: '{{ parameters["root_cause"] }}'
+              fix_applied: '{{ parameters["fix_applied"] }}'
+              severity: '{{ parameters["severity"] }}'
+      position:
+        x: 120
+        "y": 1200
+      isCollapsed: false
+      paused: false
+
+    - id: "search-trigger"
+      name: "Search Issues"
+      type: "TYPE_TRIGGER"
+      component: "start"
+      configuration:
+        templates:
+          - name: "search"
+            parameters:
+              - name: "query"
+                type: "string"
+            payload:
+              query: '{{ parameters["query"] }}'
+      position:
+        x: 120
+        "y": 1800
+      isCollapsed: false
+      paused: false
+
+    # ── Auto-capture Flow ────────────────────────────────────────────
+
+    - id: "search-similar"
+      name: "Search Past Issues"
+      type: "TYPE_ACTION"
+      component: "http"
+      configuration:
+        method: "GET"
+        url: "http://localhost:8042/api/search?q={{ root().data.error_message }}&limit=3"
+        retry:
+          enabled: false
+        timeoutSeconds: 10
+      position:
+        x: 760
+        "y": 100
+      isCollapsed: false
+      paused: false
+
+    - id: "check-match"
+      name: "Past Fix Found?"
+      type: "TYPE_ACTION"
+      component: "if"
+      configuration:
+        expression: "{{ $['Search Past Issues'].data.count > 0 }}"
+      position:
+        x: 1400
+        "y": 100
+      isCollapsed: false
+      paused: false
+
+    - id: "notify-match"
+      name: "Notify: Similar Issue Found"
+      type: "TYPE_ACTION"
+      component: "slack.sendMessage"
+      configuration:
+        channel: "#ops-alerts"
+        text: |
+          :mag: *SuperRecall found a similar past issue!*
+
+          *Current error:* {{ root().data.error_message }}
+          *Service:* {{ root().data.service }} ({{ root().data.environment }})
+
+          *Similar past fix:*
+          > {{ $['Search Past Issues'].data.results[0].fix_applied }}
+
+          _Similarity: {{ $['Search Past Issues'].data.results[0].similarity }}_
+      position:
+        x: 2040
+        "y": -100
+      isCollapsed: false
+      paused: false
+
+    - id: "notify-new"
+      name: "Notify: New Issue Type"
+      type: "TYPE_ACTION"
+      component: "slack.sendMessage"
+      configuration:
+        channel: "#ops-alerts"
+        text: |
+          :warning: *New workflow issue (no past match)*
+
+          *Service:* {{ root().data.service }} ({{ root().data.environment }})
+          *Error:* {{ root().data.error_message }}
+          *Workflow:* {{ root().data.workflow_name }}
+
+          _No similar past issues found. Once resolved, log the fix with `/log-fix`._
+      position:
+        x: 2040
+        "y": 300
+      isCollapsed: false
+      paused: false
+
+    - id: "save-to-memory"
+      name: "Save to SuperPlane Memory"
+      type: "TYPE_ACTION"
+      component: "upsertMemory"
+      configuration:
+        namespace: "superrecall-issues"
+        matchList:
+          - name: "error_hash"
+            value: "{{ root().data.service }}-{{ root().data.environment }}"
+        valueList:
+          - name: "service"
+            value: "{{ root().data.service }}"
+          - name: "environment"
+            value: "{{ root().data.environment }}"
+          - name: "error_message"
+            value: "{{ root().data.error_message }}"
+          - name: "workflow_name"
+            value: "{{ root().data.workflow_name }}"
+          - name: "logged_at"
+            value: "{{ string(int(now().Unix())) }}"
+      position:
+        x: 2680
+        "y": 100
+      isCollapsed: false
+      paused: false
+
+    # ── Manual Log Flow ──────────────────────────────────────────────
+
+    - id: "log-to-api"
+      name: "Log to SuperRecall"
+      type: "TYPE_ACTION"
+      component: "http"
+      configuration:
+        method: "POST"
+        url: "http://localhost:8042/api/issues"
+        headers:
+          Content-Type: "application/json"
+        body: |
+          {
+            "service": "{{ root().data.service }}",
+            "environment": "{{ root().data.environment }}",
+            "error_message": "{{ root().data.error_message }}",
+            "root_cause": "{{ root().data.root_cause }}",
+            "fix_applied": "{{ root().data.fix_applied }}",
+            "severity": "{{ root().data.severity }}",
+            "tags": [],
+            "workflow_name": "",
+            "additional_notes": "Logged manually via SuperPlane console."
+          }
+        timeoutSeconds: 10
+      position:
+        x: 760
+        "y": 1200
+      isCollapsed: false
+      paused: false
+
+    - id: "confirm-logged"
+      name: "Confirm Logged"
+      type: "TYPE_ACTION"
+      component: "slack.sendMessage"
+      configuration:
+        channel: "#ops-alerts"
+        text: |
+          :white_check_mark: *Fix logged to SuperRecall*
+
+          *Service:* {{ root().data.service }} ({{ root().data.environment }})
+          *Fix:* {{ root().data.fix_applied }}
+
+          _This fix is now searchable by the whole team._
+      position:
+        x: 1400
+        "y": 1200
+      isCollapsed: false
+      paused: false
+
+    # ── Search Flow ──────────────────────────────────────────────────
+
+    - id: "search-api"
+      name: "Semantic Search"
+      type: "TYPE_ACTION"
+      component: "http"
+      configuration:
+        method: "GET"
+        url: "http://localhost:8042/api/search?q={{ root().data.query }}&limit=5"
+        timeoutSeconds: 10
+      position:
+        x: 760
+        "y": 1800
+      isCollapsed: false
+      paused: false
+
+    - id: "post-results"
+      name: "Post Results"
+      type: "TYPE_ACTION"
+      component: "slack.sendMessage"
+      configuration:
+        channel: "#ops-alerts"
+        text: |
+          :mag: *SuperRecall Search Results*
+
+          *Query:* "{{ root().data.query }}"
+          *Results found:* {{ $['Semantic Search'].data.count }}
+
+          {{ $['Semantic Search'].data.results }}
+      position:
+        x: 1400
+        "y": 1800
+      isCollapsed: false
+      paused: false
+
+  # ── Edges ────────────────────────────────────────────────────────
+  edges:
+    # Auto-capture flow
+    - sourceId: "workflow-failed"
+      targetId: "search-similar"
+      channel: "default"
+    - sourceId: "search-similar"
+      targetId: "check-match"
+      channel: "default"
+    - sourceId: "check-match"
+      targetId: "notify-match"
+      channel: "true"
+    - sourceId: "check-match"
+      targetId: "notify-new"
+      channel: "false"
+    - sourceId: "notify-match"
+      targetId: "save-to-memory"
+      channel: "default"
+    - sourceId: "notify-new"
+      targetId: "save-to-memory"
+      channel: "default"
+
+    # Manual log flow
+    - sourceId: "manual-log"
+      targetId: "log-to-api"
+      channel: "default"
+    - sourceId: "log-to-api"
+      targetId: "confirm-logged"
+      channel: "default"
+
+    # Search flow
+    - sourceId: "search-trigger"
+      targetId: "search-api"
+      channel: "default"
+    - sourceId: "search-api"
+      targetId: "post-results"
+      channel: "default"
