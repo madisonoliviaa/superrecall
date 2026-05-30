@@ -94,7 +94,7 @@ spec:
       component: "http"
       configuration:
         method: "GET"
-        url: "http://localhost:8042/api/search?q={{ root().data.error_message }}&limit=3"
+        url: "https://superrecall-api.onrender.com/api/search?q={{ root().data.error_message }}&limit=3"
         retry:
           enabled: false
         timeoutSeconds: 10
@@ -192,7 +192,7 @@ spec:
       component: "http"
       configuration:
         method: "POST"
-        url: "http://localhost:8042/api/issues"
+        url: "https://superrecall-api.onrender.com/api/issues"
         headers:
           Content-Type: "application/json"
         body: |
@@ -241,7 +241,7 @@ spec:
       component: "http"
       configuration:
         method: "GET"
-        url: "http://localhost:8042/api/search?q={{ root().data.query }}&limit=5"
+        url: "https://superrecall-api.onrender.com/api/search?q={{ root().data.query }}&limit=5"
         timeoutSeconds: 10
       position:
         x: 760
