@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuperRecall — Workflow Memory</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --text: #e0e0e8;
+      --muted: #8888a0;
+      --accent: #7c5cfc;
+      --accent-glow: rgba(124, 92, 252, 0.15);
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --cyan: #22d3ee;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .header h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-top: 1rem;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.85rem;
+    }
+
+    .stat strong {
+      color: var(--accent);
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 0.8rem 1.5rem;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-weight: 500;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      font-size: 0.95rem;
+    }
+
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Search ── */
+    .search-box {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-box input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .search-box input::placeholder { color: var(--muted); }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Results ── */
+    .results-header {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 0.75rem;
+      transition: border-color 0.2s;
+    }
+
+    .result-card:hover { border-color: var(--accent); }
+
+    .result-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-service { background: rgba(124, 92, 252, 0.15); color: var(--accent); }
+    .badge-env { background: rgba(34, 211, 238, 0.15); color: var(--cyan); }
+    .badge-p1 { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+    .badge-p2 { background: rgba(251, 191, 36, 0.15); color: var(--yellow); }
+    .badge-p3 { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+
+    .similarity {
+      font-size: 0.8rem;
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .result-field { margin-bottom: 0.6rem; }
+    .result-field label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+
+    .result-field p {
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .fix-text {
+      color: var(--green);
+      background: rgba(52, 211, 153, 0.08);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      border-left: 3px solid var(--green);
+    }
+
+    /* ── Log Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group.full { grid-column: 1 / -1; }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.7rem 0.85rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .form-actions {
+      margin-top: 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--green);
+      color: #000;
+      padding: 0.85rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--muted);
+    }
+
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .stats { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>SuperRecall</h1>
+      <p>Semantic search for SuperPlane workflow issues</p>
+      <div class="stats">
+        <div class="stat"><strong id="issue-count">0</strong> issues logged</div>
+        <div class="stat">Powered by <strong>ChromaDB</strong></div>
+        <div class="stat">MCP + REST API</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="search">Search Issues</button>
+      <button class="tab" data-tab="log">Log a Fix</button>
+      <button class="tab" data-tab="browse">Browse All</button>
+    </div>
+
+    <!-- Search Tab -->
+    <div id="tab-search" class="tab-content active">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Describe the problem... e.g. 'database won't connect'" />
+        <button class="btn" id="search-btn" onclick="doSearch()">Search</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- Log Tab -->
+    <div id="tab-log" class="tab-content">
+      <form id="log-form" onsubmit="logIssue(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Service</label>
+            <input type="text" name="service" placeholder="e.g. Redis, API, PostgreSQL" required />
+          </div>
+          <div class="form-group">
+            <label>Environment</label>
+            <select name="environment" required>
+              <option value="prod">Production</option>
+              <option value="staging">Staging</option>
+              <option value="dev">Development</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Severity</label>
+            <select name="severity">
+              <option value="P1">P1 — Critical</option>
+              <option value="P2" selected>P2 — Major</option>
+              <option value="P3">P3 — Minor</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Workflow Name</label>
+            <input type="text" name="workflow_name" placeholder="SuperPlane canvas name (optional)" />
+          </div>
+          <div class="form-group full">
+            <label>Error Message</label>
+            <textarea name="error_message" placeholder="What error or symptom did you see?" required></textarea>
+          </div>
+          <div class="form-group full">
+            <label>Root Cause</label>
+            <textarea name="root_cause" placeholder="What actually caused the issue?" required></textarea>
+          </div>
+          <div class="form-group full">
+            <label>Fix Applied</label>
+            <textarea name="fix_applied" placeholder="What did you do to fix it?" required></textarea>
+          </div>
+          <div class="form-group full">
+            <label>Additional Notes</label>
+            <textarea name="additional_notes" placeholder="Any extra context (optional)"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn">Log Issue</button>
+          <button type="reset" class="btn btn-secondary">Clear</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Browse Tab -->
+    <div id="tab-browse" class="tab-content">
+      <div id="browse-results"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = window.location.hostname === 'localhost'
+      ? 'http://localhost:8042'
+      : (window.API_URL || 'http://localhost:8042');
+
+    // ── Tabs ──
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        if (tab.dataset.tab === 'browse') loadAll();
+      });
+    });
+
+    // ── Search ──
+    document.getElementById('search-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    async function doSearch() {
+      const q = document.getElementById('search-input').value.trim();
+      if (!q) return;
+
+      const results = document.getElementById('search-results');
+      results.innerHTML = '<div class="loading"><span class="spinner"></span>Searching...</div>';
+
+      try {
+        const res = await fetch(`${API}/api/search?q=${encodeURIComponent(q)}&limit=5`);
+        const data = await res.json();
+
+        if (data.count === 0) {
+          results.innerHTML = `
+            <div class="empty">
+              <div class="empty-icon">&#128269;</div>
+              <p>No similar issues found for "${q}"</p>
+              <p style="margin-top:0.5rem;font-size:0.85rem">Try different words or log a new issue</p>
+            </div>`;
+          return;
+        }
+
+        results.innerHTML = `<div class="results-header">${data.count} result${data.count > 1 ? 's' : ''} for "${q}"</div>`;
+        data.results.forEach(r => {
+          results.innerHTML += renderCard(r, true);
+        });
+      } catch (err) {
+        results.innerHTML = `<div class="empty"><p>Error: ${err.message}</p><p style="font-size:0.85rem;margin-top:0.5rem">Is the API server running on ${API}?</p></div>`;
+      }
+    }
+
+    // ── Log ──
+    async function logIssue(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form));
+      data.tags = [];
+
+      try {
+        const res = await fetch(`${API}/api/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const result = await res.json();
+        showToast('Issue logged — searchable immediately');
+        form.reset();
+        loadStats();
+      } catch (err) {
+        showToast('Error: ' + err.message);
+      }
+    }
+
+    // ── Browse ──
+    async function loadAll() {
+      const results = document.getElementById('browse-results');
+      results.innerHTML = '<div class="loading"><span class="spinner"></span>Loading...</div>';
+
+      try {
+        const res = await fetch(`${API}/api/issues?limit=50`);
+        const data = await res.json();
+
+        if (data.count === 0) {
+          results.innerHTML = '<div class="empty"><div class="empty-icon">&#128203;</div><p>No issues logged yet</p></div>';
+          return;
+        }
+
+        results.innerHTML = `<div class="results-header">${data.count} issues logged</div>`;
+        data.issues.forEach(r => {
+          results.innerHTML += renderCard(r, false);
+        });
+      } catch (err) {
+        results.innerHTML = `<div class="empty"><p>Error: ${err.message}</p></div>`;
+      }
+    }
+
+    // ── Render Card ──
+    function renderCard(r, showSimilarity) {
+      const sevClass = r.severity === 'P1' ? 'badge-p1' : r.severity === 'P3' ? 'badge-p3' : 'badge-p2';
+      const sim = showSimilarity && r.similarity != null
+        ? `<span class="similarity">${Math.round(r.similarity * 100)}% match</span>`
+        : '';
+
+      return `
+        <div class="result-card">
+          <div class="result-top">
+            <div class="badges">
+              <span class="badge badge-service">${esc(r.service)}</span>
+              <span class="badge badge-env">${esc(r.environment)}</span>
+              <span class="badge ${sevClass}">${esc(r.severity)}</span>
+            </div>
+            ${sim}
+          </div>
+          <div class="result-field">
+            <label>Error</label>
+            <p>${esc(r.error_message)}</p>
+          </div>
+          ${r.root_cause ? `<div class="result-field"><label>Root Cause</label><p>${esc(r.root_cause)}</p></div>` : ''}
+          ${r.fix_applied ? `<div class="result-field"><label>Fix Applied</label><p class="fix-text">${esc(r.fix_applied)}</p></div>` : ''}
+        </div>`;
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ── Toast ──
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ── Stats ──
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API}/api/health`);
+        const data = await res.json();
+        document.getElementById('issue-count').textContent = data.issues_count;
+      } catch {}
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>
