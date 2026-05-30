@@ -420,7 +420,7 @@
   <script>
     const API = window.location.hostname === 'localhost'
       ? 'http://localhost:8042'
-      : (window.API_URL || 'http://localhost:8042');
+      : 'https://superrecall-api.onrender.com';
 
     // ── Tabs ──
     document.querySelectorAll('.tab').forEach(tab => {
