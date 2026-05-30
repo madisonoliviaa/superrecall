@@ -2,20 +2,19 @@ services:
   # Service 1: SuperRecall API (FastAPI + ChromaDB)
   - type: web
     name: superrecall-api
-    runtime: python
+    env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
-    healthCheckPath: /api/health
 
-  # Service 2: SuperRecall Frontend (Static Site)
-  - type: web
-    name: superrecall-frontend
-    runtime: static
-    buildCommand: echo "Static site ready"
+staticSites:
+  # Service 2: SuperRecall Frontend
+  - name: superrecall-frontend
+    buildCommand: echo "ready"
     staticPublishPath: ./frontend
     headers:
       - path: /*

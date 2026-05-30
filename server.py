@@ -5,6 +5,7 @@ REST API server backed by ChromaDB for vector search.
 Run: uvicorn server:app --host 0.0.0.0 --port 8042 --reload
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -14,12 +15,69 @@ import uuid
 import json
 from datetime import datetime, timezone
 
+# ── ChromaDB ─────────────────────────────────────────────────────────
+chroma = chromadb.PersistentClient(path="./data/chromadb")
+collection = chroma.get_or_create_collection(
+    name="workflow_issues",
+    metadata={"hnsw:space": "cosine"},
+)
+
+
+# ── Auto-seed on startup (for Render's ephemeral filesystem) ────────
+def _auto_seed():
+    """Seed the DB with example data if empty (runs once on startup)."""
+    if collection.count() > 0:
+        return
+
+    from seed_data import ISSUES
+    print(f"[SuperRecall] Auto-seeding {len(ISSUES)} workflow issues...")
+    for issue in ISSUES:
+        issue_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        tags = issue.get("tags", [])
+        doc = "\n".join([
+            f"Service: {issue['service']}",
+            f"Environment: {issue['environment']}",
+            f"Error: {issue['error_message']}",
+            f"Root Cause: {issue['root_cause']}",
+            f"Fix: {issue['fix_applied']}",
+            f"Severity: {issue.get('severity', 'P2')}",
+            f"Workflow: {issue.get('workflow_name', '')}",
+            f"Tags: {', '.join(tags)}",
+            f"Notes: {issue.get('additional_notes', '')}",
+        ])
+        collection.add(
+            ids=[issue_id],
+            documents=[doc.strip()],
+            metadatas=[{
+                "service": issue["service"],
+                "environment": issue["environment"],
+                "error_message": issue["error_message"],
+                "root_cause": issue["root_cause"],
+                "fix_applied": issue["fix_applied"],
+                "severity": issue.get("severity", "P2"),
+                "workflow_name": issue.get("workflow_name", ""),
+                "tags": json.dumps(tags),
+                "additional_notes": issue.get("additional_notes", ""),
+                "timestamp": now,
+            }],
+        )
+    print(f"[SuperRecall] Seeded {len(ISSUES)} issues.")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    _auto_seed()
+    yield
+
+
 # ── App ──────────────────────────────────────────────────────────────
 app = FastAPI(
     title="SuperRecall",
     description="Semantic search for SuperPlane workflow issues. "
                 "Log what went wrong, what fixed it, and search by meaning — not keywords.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -27,13 +85,6 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# ── ChromaDB ─────────────────────────────────────────────────────────
-chroma = chromadb.PersistentClient(path="./data/chromadb")
-collection = chroma.get_or_create_collection(
-    name="workflow_issues",
-    metadata={"hnsw:space": "cosine"},
 )
 
 
